@@ -1,0 +1,4 @@
+esptool
+jupyter
+notebook
+adafruit-ampy

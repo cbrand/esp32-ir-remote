@@ -1,0 +1,11 @@
+{
+    "version": 1,
+    "client_id": "mqtt-remote-living-room",
+    "topic_prefix": "app/ir-remote/living-room",
+    "user": "mqtt-remote",
+    "password": "",
+    "server": "scolterius.net",
+    "port": 8883,
+    "ssid": "",
+    "wifi_pw": ""
+}
