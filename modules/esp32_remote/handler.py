@@ -15,7 +15,7 @@ loop = uasyncio.get_event_loop()
 
 def current_isotime():
     current_time = time.localtime()
-    return "{}-{}-{}T{}:{}:{}".format(*current_time[0:6])
+    return "{:04d}-{:02d}-{:02d}T{:02d}:{:02d}:{:02d}".format(*current_time[0:6])
 
 
 class IRHandler:
