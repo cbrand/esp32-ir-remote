@@ -175,7 +175,7 @@ class Handler:
             await self.send_lifesign()
 
     async def send_lifesign(self) -> None:
-        await self.client.publish(self.topic_name("livesign"), json.dumps({"ticks": time.ticks_ms(), "datetime": current_isotime()}), False, 0)
+        await self.client.publish(self.topic_name("livesign"), json.dumps({"ticks": time.ticks_ms(), "datetime": current_isotime()}), True, 0)
         self.last_lifesign = time.ticks_ms()
 
     def topic_name(self, name: str) -> str:
