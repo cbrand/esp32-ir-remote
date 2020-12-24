@@ -2,4 +2,5 @@
 config.json
 venv
 firmware.bin
-
+*.ipynb
+*.ipynb_checkpoints

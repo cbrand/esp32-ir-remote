@@ -5,8 +5,8 @@ import uasyncio
 import json
 from mqtt_as import MQTTClient
 from .config import get_config
-from ir.ir_tx import NEC as NECTx
-from ir.ir_rx import NEC as NECRx, NECMessage
+from ir.ir_tx import NEC as NECTx, RC6 as RC6Tx
+from ir.ir_rx import NEC as NECRx, RC6 as RC6Rx, NECMessage, RC6Message
 from machine import Pin
 from ntptime import settime
 
@@ -23,6 +23,7 @@ class IRHandler:
         self.tx_pin = Pin(config["tx_pin"], Pin.OUT)
         self.rx_pin = Pin(config["rx_pin"], Pin.IN)
         self.nec_tx = NECTx(self.tx_pin)
+        self.rc6_tx = RC6Tx(self.tx_pin, rmt=self.nec_tx.rmt)
         self.receiver = None
         self.buffer = []
         self.stopped = False
@@ -41,14 +42,24 @@ class IRHandler:
         if isinstance(mode, str) and mode.upper() == "NEC":
             self.receiver = NECRx(self.rx_pin, callback)
             return
+        elif isinstance(mode, str) and mode.upper() == "RC6":
+            self.receiver = RC6Rx(self.rx_pin, callback)
         elif mode is not None:
             print("Unknown mode requested for listening to IR signals \"{}\"".format(mode))
         
 
     async def send_nec(self, device_id: int, command: int) -> None:
         print("Adding NECMessage({}, {}) to send buffer".format(device_id, command))
-        self.buffer.append(NECMessage(device_id, command))
-        while command in self.buffer:
+        nec_message = NECMessage(device_id, command)
+        self.buffer.append(nec_message)
+        while nec_message in self.buffer:
+            await uasyncio.sleep_ms(1)
+    
+    async def send_rc6(self, control: int, information: int, mode: int = 0) -> None:
+        print("Adding RC6Message({}, {}, {}) to send buffer".format(mode, control, information))
+        rc6_message = RC6Message(mode, control, information)
+        self.buffer.append(rc6_message)
+        while rc6_message in self.buffer:
             await uasyncio.sleep_ms(1)
 
     def stop(self) -> None:
@@ -63,6 +74,9 @@ class IRHandler:
                     if isinstance(item, NECMessage):
                         print("SENDING ", item)
                         self.nec_tx.send(item.device_id, item.command)
+                    if isinstance(item, RC6Message):
+                        print("SENDING", item)
+                        self.rc6_tx.send(item.mode, item.control, item.information)
                     self.buffer.remove(item)
                 except Exception as e:
                     print(e)
@@ -115,6 +129,8 @@ class Handler:
         data_type = data.get("type", "").upper()
         if data_type == "NEC":
             await self.send_nec_command(data)
+        if data_type == "RC9":
+            await self.send_rc9_command(data)
         elif data_type == "SCENE":
             await self.play_scene(data)
         elif data_type == "WAIT":
@@ -129,6 +145,15 @@ class Handler:
             await self.send_error("No command or device_id added in nec command", data)
             return
         await self.ir_handler.send_nec(data["device_id"], data["command"])
+        await self._record_send_command(data)
+    
+    async def send_rc9_command(self, data: dict) -> None:
+        if "control" not in data or "information" not in data:
+            await self.send_error("No control or information added in rc9 command", data)
+        await self.ir_handler.send_rc6(mode=data.get("mode", 0), control=data["control"], information=data["information"])
+        await self._record_send_command(data)
+
+    async def _record_send_command(self, data: dict) -> None:
         await self.client.publish(self.topic_name("ir/last-sent-command"), json.dumps(data), False, 0)
 
     async def play_scene(self, data: dict) -> None:
