@@ -92,7 +92,7 @@ def qos_check(qos):
 # Exceptions from connectivity failures are handled by MQTTClient subclass.
 class MQTT_base:
     REPUB_COUNT = 0  # TEST
-    DEBUG = False
+    DEBUG = True
 
     def __init__(self, config):
         # MQTT config
@@ -226,6 +226,7 @@ class MQTT_base:
         self.dprint('Connecting to broker.')
         if self._ssl:
             import ussl
+            tries = 0
             while True:
                 try:
                     gc.collect()
@@ -233,7 +234,8 @@ class MQTT_base:
                     gc.collect()
                     break
                 except OSError as e:
-                    if e.args[0] not in BUSY_ERRORS:
+                    tries += 1
+                    if e.args[0] not in BUSY_ERRORS and tries > 10:
                         raise
                     await asyncio.sleep_ms(_DEFAULT_MS)
         sock.setblocking(False)

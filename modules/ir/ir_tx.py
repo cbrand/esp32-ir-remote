@@ -68,15 +68,18 @@ class NEC(InfraredTx):
 RC6_TIME_FRAME_US = const(444)
 
 class RC6(InfraredTx):
+    trailing_flag = False
+
     def send(self, control: int, information: int, header: int = 0) -> None:
         self._current_state = None
+        print("SENDING RC6 Message with Control=%s, Information=%s, Header=%s" % (control, information, header))
         self._add_start_burst()
         self._add_start_flag()
-        self._add_header(header)
+        self._add_header(header, trailing_flag = self.trailing_flag)
+        self.trailing_flag = not self.trailing_flag
         self._add_control(control)
         self._add_information(information)
         self._finalize()
-        print("Sending %s" % self._buffer)
         self.trigger()
 
     def _add_start_burst(self) -> None:
