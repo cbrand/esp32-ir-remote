@@ -44,6 +44,7 @@ class IRHandler:
             return
         elif isinstance(mode, str) and mode.upper() == "RC6":
             self.receiver = RC6Rx(self.rx_pin, callback)
+            return
         elif mode is not None:
             print("Unknown mode requested for listening to IR signals \"{}\"".format(mode))
         
@@ -74,9 +75,11 @@ class IRHandler:
                     if isinstance(item, NECMessage):
                         print("SENDING ", item)
                         self.nec_tx.send(item.device_id, item.command)
+                        await uasyncio.sleep_ms(100)
                     if isinstance(item, RC6Message):
                         print("SENDING", item)
-                        self.rc6_tx.send(item.mode, item.control, item.information)
+                        self.rc6_tx.send(header=item.header, control=item.control, information=item.information)
+                        await uasyncio.sleep_ms(100)
                     self.buffer.remove(item)
                 except Exception as e:
                     print(e)
@@ -129,8 +132,8 @@ class Handler:
         data_type = data.get("type", "").upper()
         if data_type == "NEC":
             await self.send_nec_command(data)
-        if data_type == "RC9":
-            await self.send_rc9_command(data)
+        if data_type == "RC6":
+            await self.send_rc6_command(data)
         elif data_type == "SCENE":
             await self.play_scene(data)
         elif data_type == "WAIT":
@@ -147,7 +150,7 @@ class Handler:
         await self.ir_handler.send_nec(data["device_id"], data["command"])
         await self._record_send_command(data)
     
-    async def send_rc9_command(self, data: dict) -> None:
+    async def send_rc6_command(self, data: dict) -> None:
         if "control" not in data or "information" not in data:
             await self.send_error("No control or information added in rc9 command", data)
         await self.ir_handler.send_rc6(mode=data.get("mode", 0), control=data["control"], information=data["information"])
