@@ -138,16 +138,12 @@ RC6_NORMAL_BIT_TIME = const(RC6_TIME_FRAME_US * 2)
 RC6_TRAILER_BIT_TIME = const(RC6_NORMAL_BIT_TIME * 2)
 RC6_SIGNAL_FREE_TIME = const(RC6_TIME_FRAME_US * 6)
 RC6_BLOCK_TIME = const(
-    sum(
-        (
-            RC6_LS_TIME,
-            RC6_NORMAL_BIT_TIME,
-            RC6_NORMAL_BIT_TIME * 3,
-            RC6_TRAILER_BIT_TIME,
-            RC6_NORMAL_BIT_TIME * 16,
-            RC6_SIGNAL_FREE_TIME,
-        )
-    )
+    RC6_LS_TIME  # noqa: W503
+    + RC6_NORMAL_BIT_TIME  # noqa: W503
+    + RC6_NORMAL_BIT_TIME * 3  # noqa: W503
+    + RC6_TRAILER_BIT_TIME  # noqa: W503
+    + RC6_NORMAL_BIT_TIME * 16  # noqa: W503
+    + RC6_SIGNAL_FREE_TIME  # noqa: W503
 )
 
 
