@@ -1,5 +1,7 @@
+import time
 import select
 import socket
+import uasyncio
 from .core import ISCPMessage, eISCPPacket, parse_info, command_to_packet, filter_for_message, command_to_iscp, iscp_to_command
 
 
@@ -61,15 +63,17 @@ class eISCP:
         return self._info
 
     @info.setter
-    def info(self, value: "Dict[str, str]"):
+    def info(self, value: "Dict[str, str]") -> None:
         self._info = value
 
     def _ensure_socket_connected(self) -> None:
         if self.command_socket is None:
-            self.command_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.command_socket.settimeout(self.CONNECT_TIMEOUT)
-            self.command_socket.connect((self.host, self.port))
-            self.command_socket.setblocking(0)
+            command_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            command_socket.settimeout(self.CONNECT_TIMEOUT)
+            command_socket.connect((self.host, self.port))
+            command_socket.setblocking(0)
+            self.command_socket = uasyncio.StreamWriter(command_socket)
+            
 
     def disconnect(self) -> None:
         try:
@@ -85,34 +89,45 @@ class eISCP:
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         self.disconnect()
 
-    def send(self, iscp_message: str) -> None:
+    async def send(self, iscp_message: str) -> None:
         """Send a low-level ISCP message, like ``MVL50``.
         This does not return anything, nor does it wait for a response
         from the receiver. You can query responses via :meth:`get`,
         or use :meth:`raw` to send a message and waiting for one.
         """
         self._ensure_socket_connected()
-        self.command_socket.send(command_to_packet(iscp_message))
+        self.command_socket.write(command_to_packet(iscp_message))
+        await self.command_socket.drain()
 
-    def get(self, timeout: int=0.1) -> bytes:
+    async def get(self, timeout: int=0.1) -> bytes:
         """Return the next message sent by the receiver, or, after
         ``timeout`` has passed, return ``None``.
         """
         self._ensure_socket_connected()
 
-        ready = select.select([self.command_socket], [], [], timeout or 0)
-        if ready[0]:
-            header_bytes = self.command_socket.recv(16)
-            header = eISCPPacket.parse_header(header_bytes)
-            body = b''
-            while len(body) < header.data_size:
-                ready = select.select([self.command_socket], [], [], timeout or 0)
-                if not ready[0]:
-                    return None
-                body += self.command_socket.recv(header.data_size - len(body))
-            return ISCPMessage.parse(body.decode())
+        start = time.ticks_ms()
+        header_bytes = b""
+        while start + timeout * 1000 > time.ticks_ms() and len(header_bytes) < 16:
+            header_bytes += await self.command_socket.read(16 - len(header_bytes))
+            if len(header_bytes) < 16:
+                await uasyncio.sleep_ms(1)
 
-    def raw(self, iscp_message):
+        if len(header_bytes) < 16:
+            return None
+        
+        
+        header = eISCPPacket.parse_header(header_bytes)
+        body = b''
+        start = time.ticks_ms()
+        while len(body) < header.data_size:
+            body += await self.command_socket.read(header.data_size - len(body))
+            if start + timeout * 1000 > time.ticks_ms():
+                return None
+            elif len(body) < header.data_size:
+                await uasyncio.sleep_ms(1)
+        return ISCPMessage.parse(body.decode())
+
+    async def raw(self, iscp_message):
         """Send a low-level ISCP message, like ``MVL50``, and wait
         for a response.
         While the protocol is designed to acknowledge each message with
@@ -125,29 +140,31 @@ class eISCP:
         processing all incoming messages the same way, regardless of
         their origin.
         """
-        while self.get(False):
+        while await self.get(False):
             # Clear all incoming messages. If not yet queried,
             # they are lost. This is so that we can find the real
             # response to our sent command later.
             pass
-        self.send(iscp_message)
-        return filter_for_message(self.get, iscp_message)
+        await self.send(iscp_message)
+        return await filter_for_message(self.get, iscp_message)
 
-    def command(self, command: str, argument: str) -> "Optional[str]":
+    async def command(self, command: str, argument: str) -> "Optional[Tuple[str, str]]":
         """Send a high-level command to the receiver, return the
         receiver's response formatted has a command.
         This is basically a helper that combines :meth:`raw`,
         :func:`command_to_iscp` and :func:`iscp_to_command`.
         """
         iscp_message = command_to_iscp(command, argument)
-        response = self.raw(iscp_message)
+        response = await self.raw(iscp_message)
         if response:
             return iscp_to_command(response)
+        
+        return None
 
-    def power_on(self) -> Optional[str]:
+    async def power_on(self) -> "Optional[Tuple[str, str]]":
         """Turn the receiver power on."""
-        return self.command('PWR', '01')
+        return await self.command('PWR', '01')
 
-    def power_off(self) -> Optional[str]:
+    async def power_off(self) -> "Optional[Tuple[str, str]]":
         """Turn the receiver power off."""
-        return self.command('PWR', '00')
+        return await self.command('PWR', '00')

@@ -4,11 +4,11 @@ import time
 import uasyncio
 import json
 from mqtt_as import MQTTClient
-from .config import get_config
 from ir.ir_tx import NEC as NECTx, RC6 as RC6Tx
 from ir.ir_rx import NEC as NECRx, RC6 as RC6Rx, NECMessage, RC6Message
 from machine import Pin
 from ntptime import settime
+from .iscp_handler import ISCPHandler
 
 loop = uasyncio.get_event_loop()
 
@@ -47,7 +47,6 @@ class IRHandler:
             return
         elif mode is not None:
             print("Unknown mode requested for listening to IR signals \"{}\"".format(mode))
-        
 
     async def send_nec(self, device_id: int, command: int) -> None:
         print("Adding NECMessage({}, {}) to send buffer".format(device_id, command))
@@ -105,6 +104,7 @@ class Handler:
         self.stopped = False
         self.ir_handler = IRHandler(config)
         self.last_lifesign = None
+        self.iscp_handler = ISCPHandler()
 
     def stop(self):
         self.ir_handler.stop()
@@ -134,6 +134,8 @@ class Handler:
             await self.send_nec_command(data)
         if data_type == "RC6":
             await self.send_rc6_command(data)
+        elif data_type == "ISCP":
+            await self.send_iscp_command(data)
         elif data_type == "SCENE":
             await self.play_scene(data)
         elif data_type == "WAIT":
@@ -142,6 +144,30 @@ class Handler:
             await self.play_repeat(data)
         else:
             await self.send_error("Unknown command type", data)
+
+    async def iscp_discover(self) -> None:
+        try:
+            print("Searching for ISCP devices on network")
+            result = await self.iscp_handler.discover()
+            print("ISCP devices found: {}".format(result))
+            await self.client.publish(self.topic_name("iscp/discover/result"), json.dumps(result), False, 0)
+        except Exception as error:
+            print("Failed Discovering ISCP devices with error {}".format(error))
+            await self.send_error("Failed discovering iscp devices with error {}".format(error))
+
+    async def send_iscp_command(self, data: dict) -> None:
+        if not "identifier" in data or not "command" in data or not "argument" in data:
+            await self.send_error("No identifier, command or argument provided in iscp payload", data)
+        identifier: str = data["identifier"]
+        command: str = data["command"]
+        argument: str = data["argument"]
+
+        result = await self.iscp_handler.send(identifier, command, argument)
+        if result is None:
+            await self.send_error("Could not send ISCP command ({}, {}={})".format(identifier, command, argument), data)
+        
+        data["result"] = result
+        await self._record_send_command(data)
 
     async def send_nec_command(self, data: dict) -> None:
         if not "command" in data and not "device_id" in data:
@@ -188,6 +214,12 @@ class Handler:
                 loop.create_task(self.send_command(json.loads(message)))
             elif topic.endswith("ir/listening-mode"):
                 loop.create_task(self.start_listening_mode(message))
+            elif topic.endswith("iscp/command"):
+                loop.create_task(self.send_iscp_command(json.loads(message)))
+            elif topic.endswith("iscp/discover"):
+                loop.create_task(self.iscp_discover())
+            else:
+                print("Unknown MQTT topic for subscription {}".format(topic))
         except Exception as e:
             print(e)
             raise
@@ -195,6 +227,8 @@ class Handler:
     async def subscribe_topics(self, client: MQTTClient):
         await client.subscribe(self.topic_name("ir/listening-mode"), 1)
         await client.subscribe(self.topic_name("ir/command"), 1)
+        await client.subscribe(self.topic_name("iscp/discover"), 1)
+        await client.subscribe(self.topic_name("iscp/command"), 1)
         await self.send_lifesign()
         print("Subscribed to topics and published livesign to {}".format(self.topic_name("livesign")))
 

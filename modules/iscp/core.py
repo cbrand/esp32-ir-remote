@@ -136,14 +136,14 @@ def command_to_packet(command: str) -> bytes:
     return eISCPPacket(ISCPMessage(command)).get_raw()
 
 
-def filter_for_message(getter_func: "Callable[[], Optional[str]]", msg: str) -> str:
+async def filter_for_message(getter_func: "Callable[[], Optional[str]]", msg: str) -> str:
     """Helper that calls ``getter_func`` until a matching message
     is found, or the timeout occurs. Matching means the same commands
     group, i.e. for sent message MVLUP we would accept MVL13
     in response."""
     start = time.time()
     while True:
-        candidate = getter_func(0.05)
+        candidate = await getter_func(0.05)
         # It seems ISCP commands are always three characters.
         if candidate and candidate[:3] == msg[:3]:
             return candidate
