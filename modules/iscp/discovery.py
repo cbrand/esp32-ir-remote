@@ -1,7 +1,9 @@
-import uasyncio
 import socket
-import network
 import time
+
+import network
+import uasyncio
+
 from .core import eISCPPacket, parse_info
 from .eiscp import eISCP
 
@@ -34,16 +36,18 @@ def get_current_broadcast_address() -> str:
 
 
 async def discover(timeout: int = 5, clazz=None):
-    onkyo_magic = eISCPPacket('!xECNQSTN').get_raw()
-    pioneer_magic = eISCPPacket('!pECNQSTN').get_raw()
+    onkyo_magic = eISCPPacket("!xECNQSTN").get_raw()
+    pioneer_magic = eISCPPacket("!pECNQSTN").get_raw()
     found_receivers = {}
     broadcast_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
     broadcast_socket.setblocking(0)
     broadcast_address = get_current_broadcast_address()
     own_address = get_current_ip_address()
-    
+
     try:
-        broadcast_socket.bind((own_address, eISCP.ONKYO_PORT))  # The port doesn't matter. It is "0" in the original implementation. MicroPython doesn't support this.
+        broadcast_socket.bind(
+            (own_address, eISCP.ONKYO_PORT)
+        )  # The port doesn't matter. It is "0" in the original implementation. MicroPython doesn't support this.
         broadcast_socket.sendto(onkyo_magic, (broadcast_address, eISCP.ONKYO_PORT))
         broadcast_socket.sendto(pioneer_magic, (broadcast_address, eISCP.ONKYO_PORT))
         start = time.ticks_ms()
@@ -54,7 +58,7 @@ async def discover(timeout: int = 5, clazz=None):
             else:
                 data, addr = broadcast_socket.recvfrom(1024)
                 info = parse_info(data)
-                receiver = (clazz or eISCP)(addr[0], int(info['iscp_port']))
+                receiver = (clazz or eISCP)(addr[0], int(info["iscp_port"]))
                 receiver.info = info
                 found_receivers[info["identifier"]] = receiver
 

@@ -41,4 +41,3 @@ compile-and-shell: compile-and-flash shell
 
 shell:
 	picocom /dev/ttyUSB0 -b115200
-

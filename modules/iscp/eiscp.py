@@ -1,8 +1,18 @@
-import time
 import select
 import socket
+import time
+
 import uasyncio
-from .core import ISCPMessage, eISCPPacket, parse_info, command_to_packet, filter_for_message, command_to_iscp, iscp_to_command
+
+from .core import (
+    ISCPMessage,
+    command_to_iscp,
+    command_to_packet,
+    eISCPPacket,
+    filter_for_message,
+    iscp_to_command,
+    parse_info,
+)
 
 
 class eISCP:
@@ -13,6 +23,7 @@ class eISCP:
     You may want to look at the :meth:`Receiver` class instead, which
     uses a background thread.
     """
+
     ONKYO_PORT = 60128
     CONNECT_TIMEOUT = 5
 
@@ -25,35 +36,33 @@ class eISCP:
 
     @property
     def model_name(self) -> str:
-        if self.info and self.info.get('model_name'):
-            return self.info['model_name']
+        if self.info and self.info.get("model_name"):
+            return self.info["model_name"]
         else:
-            return 'unknown-model'
+            return "unknown-model"
 
     @property
     def identifier(self) -> str:
-        if self.info and self.info.get('identifier'):
-            return self.info['identifier']
+        if self.info and self.info.get("identifier"):
+            return self.info["identifier"]
         else:
-            return 'no-id'
+            return "no-id"
 
     def __repr__(self) -> str:
-        if self.info and self.info.get('model_name'):
-            model = self.info['model_name']
+        if self.info and self.info.get("model_name"):
+            model = self.info["model_name"]
         else:
-            model = 'unknown'
-        string = "<{}({}) {}:{}>".format(
-            self.__class__.__name__, model, self.host, self.port)
+            model = "unknown"
+        string = "<{}({}) {}:{}>".format(self.__class__.__name__, model, self.host, self.port)
         return string
 
     @property
     def info(self) -> "Dict[str, str]":
         if not self._info:
-            sock = socket.socket(
-                socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
             sock.setblocking(0)
-            sock.bind(('0.0.0.0', self.ONKYO_PORT))
-            sock.sendto(eISCPPacket('!xECNQSTN').get_raw(), (self.host, self.port))
+            sock.bind(("0.0.0.0", self.ONKYO_PORT))
+            sock.sendto(eISCPPacket("!xECNQSTN").get_raw(), (self.host, self.port))
 
             ready = select.select([sock], [], [], 0.1)
             if ready[0]:
@@ -73,12 +82,11 @@ class eISCP:
             command_socket.connect((self.host, self.port))
             command_socket.setblocking(0)
             self.command_socket = uasyncio.StreamWriter(command_socket)
-            
 
     def disconnect(self) -> None:
         try:
             self.command_socket.close()
-        except:
+        except Exception:
             pass
         self.command_socket = None
 
@@ -99,7 +107,7 @@ class eISCP:
         self.command_socket.write(command_to_packet(iscp_message))
         await self.command_socket.drain()
 
-    async def get(self, timeout: int=0.1) -> bytes:
+    async def get(self, timeout: int = 0.1) -> bytes:
         """Return the next message sent by the receiver, or, after
         ``timeout`` has passed, return ``None``.
         """
@@ -114,10 +122,9 @@ class eISCP:
 
         if len(header_bytes) < 16:
             return None
-        
-        
+
         header = eISCPPacket.parse_header(header_bytes)
-        body = b''
+        body = b""
         start = time.ticks_ms()
         while len(body) < header.data_size:
             body += await self.command_socket.read(header.data_size - len(body))
@@ -158,13 +165,13 @@ class eISCP:
         response = await self.raw(iscp_message)
         if response:
             return iscp_to_command(response)
-        
+
         return None
 
     async def power_on(self) -> "Optional[Tuple[str, str]]":
         """Turn the receiver power on."""
-        return await self.command('PWR', '01')
+        return await self.command("PWR", "01")
 
     async def power_off(self) -> "Optional[Tuple[str, str]]":
         """Turn the receiver power off."""
-        return await self.command('PWR', '00')
+        return await self.command("PWR", "00")

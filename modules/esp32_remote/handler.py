@@ -1,12 +1,13 @@
-from collections import namedtuple
 import gc
-import time
-import uasyncio
 import json
+import time
+
+import uasyncio
 from mqtt_as import MQTTClient
 from ntptime import settime
-from .iscp_handler import ISCPHandler
+
 from .ir_handler import IRHandler
+from .iscp_handler import ISCPHandler
 
 loop = uasyncio.get_event_loop()
 
@@ -17,7 +18,7 @@ def current_isotime():
 
 
 async def wifi_han(state):
-    print('Wifi is', 'up' if state else 'down')
+    print("Wifi is", "up" if state else "down")
     if state:
         settime()
     await uasyncio.sleep_ms(1000)
@@ -25,9 +26,9 @@ async def wifi_han(state):
 
 class Handler:
     def __init__(self, config: dict):
-        config['subs_cb'] = self.sub_cb
-        config['connect_coro'] = self.subscribe_topics
-        config['wifi_coro'] = wifi_han
+        config["subs_cb"] = self.sub_cb
+        config["connect_coro"] = self.subscribe_topics
+        config["wifi_coro"] = wifi_han
         self.config = config
         self.client = MQTTClient(config)
         self.stopped = False
@@ -85,7 +86,7 @@ class Handler:
             await self.send_error("Failed discovering iscp devices with error {}".format(error))
 
     async def send_iscp_command(self, data: dict) -> None:
-        if not "identifier" in data or not "command" in data or not "argument" in data:
+        if "identifier" not in data or "command" not in data or "argument" not in data:
             await self.send_error("No identifier, command or argument provided in iscp payload", data)
         identifier: str = data["identifier"]
         command: str = data["command"]
@@ -94,21 +95,23 @@ class Handler:
         result = await self.iscp_handler.send(identifier, command, argument)
         if result is None:
             await self.send_error("Could not send ISCP command ({}, {}={})".format(identifier, command, argument), data)
-        
+
         data["result"] = result
         await self._record_send_command(data)
 
     async def send_nec_command(self, data: dict) -> None:
-        if not "command" in data and not "device_id" in data:
+        if "command" not in data and "device_id" not in data:
             await self.send_error("No command or device_id added in nec command", data)
             return
         await self.ir_handler.send_nec(data["device_id"], data["command"])
         await self._record_send_command(data)
-    
+
     async def send_rc6_command(self, data: dict) -> None:
         if "control" not in data or "information" not in data:
             await self.send_error("No control or information added in rc9 command", data)
-        await self.ir_handler.send_rc6(mode=data.get("mode", 0), control=data["control"], information=data["information"])
+        await self.ir_handler.send_rc6(
+            mode=data.get("mode", 0), control=data["control"], information=data["information"]
+        )
         await self._record_send_command(data)
 
     async def _record_send_command(self, data: dict) -> None:
@@ -131,14 +134,16 @@ class Handler:
 
     async def send_error(self, error_message: str, context: dict = None) -> None:
         context = context or {}
-        await self.client.publish(self.topic_name("error"), json.dumps({"message": error_message, "context": context}), False, 0)
+        await self.client.publish(
+            self.topic_name("error"), json.dumps({"message": error_message, "context": context}), False, 0
+        )
         gc.collect()
 
     def sub_cb(self, topic: bytes, message: bytes, retained: bool) -> None:
         try:
             topic = topic.decode()
             message = message.decode()
-            print('Topic = {} Payload = {} Retained = {}'.format(topic, message, retained))
+            print("Topic = {} Payload = {} Retained = {}".format(topic, message, retained))
             if topic.endswith("ir/command"):
                 loop.create_task(self.send_command(json.loads(message)))
             elif topic.endswith("ir/listening-mode"):
@@ -166,7 +171,9 @@ class Handler:
             await self.send_lifesign()
 
     async def send_lifesign(self) -> None:
-        await self.client.publish(self.topic_name("livesign"), json.dumps({"ticks": time.ticks_ms(), "datetime": current_isotime()}), True, 0)
+        await self.client.publish(
+            self.topic_name("livesign"), json.dumps({"ticks": time.ticks_ms(), "datetime": current_isotime()}), True, 0
+        )
         self.last_lifesign = time.ticks_ms()
 
     def topic_name(self, name: str) -> str:
@@ -182,7 +189,9 @@ class Handler:
         print("Captured IR Command", message)
         message_dict = message.as_dict()
         message_dict["ticks"] = time.ticks_ms()
-        loop.create_task(self.client.publish(self.topic_name("ir/last-captured-command"), json.dumps(message_dict), False, 1))
+        loop.create_task(
+            self.client.publish(self.topic_name("ir/last-captured-command"), json.dumps(message_dict), False, 1)
+        )
 
     def run_forever(self) -> None:
         loop.run_until_complete(self.start())

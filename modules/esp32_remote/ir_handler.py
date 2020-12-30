@@ -1,6 +1,9 @@
 import uasyncio
-from ir.ir_tx import NEC as NECTx, RC6 as RC6Tx
-from ir.ir_rx import NEC as NECRx, RC6 as RC6Rx, NECMessage, RC6Message
+from ir.ir_rx import NEC as NECRx
+from ir.ir_rx import RC6 as RC6Rx
+from ir.ir_rx import NECMessage, RC6Message
+from ir.ir_tx import NEC as NECTx
+from ir.ir_tx import RC6 as RC6Tx
 from machine import Pin
 
 
@@ -32,7 +35,7 @@ class IRHandler:
             self.receiver = RC6Rx(self.rx_pin, callback)
             return
         elif mode is not None:
-            print("Unknown mode requested for listening to IR signals \"{}\"".format(mode))
+            print('Unknown mode requested for listening to IR signals "{}"'.format(mode))
 
     async def send_nec(self, device_id: int, command: int) -> None:
         print("Adding NECMessage({}, {}) to send buffer".format(device_id, command))
@@ -40,7 +43,7 @@ class IRHandler:
         self.buffer.append(nec_message)
         while nec_message in self.buffer:
             await uasyncio.sleep_ms(1)
-    
+
     async def send_rc6(self, control: int, information: int, mode: int = 0) -> None:
         print("Adding RC6Message({}, {}, {}) to send buffer".format(mode, control, information))
         rc6_message = RC6Message(mode, control, information)

@@ -1,8 +1,7 @@
-from collections import namedtuple
-import struct
 import re
+import struct
 import time
-
+from collections import namedtuple
 
 
 class ISCPMessage(object):
@@ -22,19 +21,19 @@ class ISCPMessage(object):
         # ! = start character
         # 1 = destination unit type, 1 means receiver
         # End character may be CR, LF or CR+LF, according to doc
-        return '!1{}\r'.format(self.data)
+        return "!1{}\r".format(self.data)
 
     @classmethod
     def parse(self, data: bytes) -> bytes:
-        EOF = '\x1a'
-        TERMINATORS = ['\n', '\r']
-        assert data[:2] == '!1'
+        EOF = "\x1a"
+        TERMINATORS = ["\n", "\r"]
+        assert data[:2] == "!1"
         eof_offset = -1
         # EOF can be followed by CR/LF/CR+LF
         if data[eof_offset] in TERMINATORS:
-          eof_offset -= 1
-          if data[eof_offset] in TERMINATORS:
             eof_offset -= 1
+            if data[eof_offset] in TERMINATORS:
+                eof_offset -= 1
         assert data[eof_offset] == EOF
         return data[2:eof_offset]
 
@@ -44,19 +43,19 @@ class eISCPPacket(object):
     wrapped inside an eISCP package.
     """
 
-    header = namedtuple('header', ('magic', 'header_size', 'data_size', 'version', 'reserved'))
+    header = namedtuple("header", ("magic", "header_size", "data_size", "version", "reserved"))
 
     def __init__(self, iscp_message: "Union[bytes, str]"):
         iscp_message = str(iscp_message)
         # We attach data separately, because Python's struct module does
         # not support variable length strings,
         header = struct.pack(
-            '!4sIIb3s',
-            b'ISCP',            # magic
-            16,                 # header size (16 bytes)
+            "!4sIIb3s",
+            b"ISCP",  # magic
+            16,  # header size (16 bytes)
             len(iscp_message),  # data size
-            0x01,               # version
-            b'\x00\x00\x00'     #reserved
+            0x01,  # version
+            b"\x00\x00\x00",  # reserved
         )
 
         if isinstance(iscp_message, str):
@@ -66,17 +65,18 @@ class eISCPPacket(object):
         # __new__, string subclass?
 
     def __str__(self):
-        return self._bytes.decode('utf-8')
+        return self._bytes.decode("utf-8")
 
     def get_raw(self):
         return self._bytes
 
     @classmethod
     def parse(cls, bytes):
-        """Parse the eISCP package given by ``bytes``.
-        """
+        """Parse the eISCP package given by ``bytes``."""
         h = cls.parse_header(bytes[:16])
-        data = bytes[h.header_size:h.header_size + h.data_size].decode()
+        start_data = h.header_size
+        end_data = h.header_size + h.data_size
+        data = bytes[start_data:end_data].decode()
         assert len(data) == h.data_size
         return data
 
@@ -91,29 +91,26 @@ class eISCPPacket(object):
         assert len(bytes) == 16
 
         # Parse the header
-        magic, header_size, data_size, version, reserved = \
-            struct.unpack('!4sIIb3s', bytes)
+        magic, header_size, data_size, version, reserved = struct.unpack("!4sIIb3s", bytes)
 
         magic = magic.decode()
         reserved = reserved.decode()
 
         # Strangly, the header contains a header_size field.
-        assert magic == 'ISCP'
+        assert magic == "ISCP"
         assert header_size == 16
 
-        return eISCPPacket.header(
-            magic, header_size, data_size, version, reserved)
-
+        return eISCPPacket.header(magic, header_size, data_size, version, reserved)
 
 
 def parse_info(data: bytes) -> "Dict[str, str]":
     response = eISCPPacket.parse(data)
     # Return string looks something like this:
     # !1ECNTX-NR609/60128/DX
-    matched = re.match(r'''!(\d)ECN([^/]*)/(\d\d\d\d\d)/(\w\w)/(.*)''', response.strip())
+    matched = re.match(r"""!(\d)ECN([^/]*)/(\d\d\d\d\d)/(\w\w)/(.*)""", response.strip())
     if matched is None:
         return None
-    
+
     identifier = matched.group(5)
     if len(identifier) > 12:
         identifier = identifier[0:12]
@@ -123,7 +120,7 @@ def parse_info(data: bytes) -> "Dict[str, str]":
         "model_name": matched.group(2),
         "iscp_port": matched.group(3),
         "area_code": matched.group(4),
-        "identifier": identifier
+        "identifier": identifier,
     }
     return info
 
@@ -151,15 +148,14 @@ async def filter_for_message(getter_func: "Callable[[], Optional[str]]", msg: st
         # exception for HDMI-CEC commands (CTV) since they don't provide any response/confirmation
         if "CTV" in msg[:3]:
             return msg
-        
+
         # The protocol docs claim that a response  should arrive
         # within *50ms or the communication has failed*. In my tests,
         # however, the interval needed to be at least 200ms before
         # I managed to see any response, and only after 300ms
         # reproducably, so use a generous timeout.
         if time.time() - start > 5.0:
-            raise ValueError('Timeout waiting for response.')
-
+            raise ValueError("Timeout waiting for response.")
 
 
 def command_to_iscp(command: str, argument: str) -> str:
