@@ -107,7 +107,7 @@ class eISCP:
         self.command_socket.write(command_to_packet(iscp_message))
         await self.command_socket.drain()
 
-    async def get(self, timeout: int = 0.1) -> bytes:
+    async def get(self, timeout: int = 0.2) -> bytes:
         """Return the next message sent by the receiver, or, after
         ``timeout`` has passed, return ``None``.
         """
@@ -124,15 +124,18 @@ class eISCP:
             return None
 
         header = eISCPPacket.parse_header(header_bytes)
+        print("Found ISCP header {}".format(header))
         body = b""
         start = time.ticks_ms()
         while len(body) < header.data_size:
             body += await self.command_socket.read(header.data_size - len(body))
-            if start + timeout * 1000 > time.ticks_ms():
+            if start + timeout * 1000 < time.ticks_ms():
                 return None
             elif len(body) < header.data_size:
                 await uasyncio.sleep_ms(1)
-        return ISCPMessage.parse(body.decode())
+        message = ISCPMessage.parse(body.decode())
+        print("Identified ISCP response: {}".format(message))
+        return message
 
     async def raw(self, iscp_message):
         """Send a low-level ISCP message, like ``MVL50``, and wait

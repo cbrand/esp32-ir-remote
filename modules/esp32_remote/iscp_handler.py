@@ -23,6 +23,7 @@ class ISCPHandler:
         if iscp is None:
             print("Didn't find ISCP target with identifier {}".format(iscp))
             return None
+        print("Found ISCP device for sending to {} ({})".format(identifier, iscp.info))
 
         return await iscp.command(iscp_command.command, iscp_command.argument)
 

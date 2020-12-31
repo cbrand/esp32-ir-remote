@@ -21,7 +21,7 @@ from utime import ticks_diff, ticks_ms
 
 gc.collect()
 import network
-from machine import unique_id
+from machine import unique_id, reset
 from micropython import const
 
 gc.collect()
@@ -336,7 +336,10 @@ class MQTT_base:
 
     def close(self):
         if self._sock is not None:
-            self._sock.close()
+            try:
+                self._sock.close()
+            except Exception:
+                pass
 
     async def _await_pid(self, pid):
         t = ticks_ms()
@@ -480,6 +483,7 @@ class MQTTClient(MQTT_base):
             self._ping_interval = p_i
         self._in_connect = False
         self._has_connected = False  # Define 'Clean Session' value to use.
+        self._reconnect_tries = 0
         if ESP8266:
             import esp
 
@@ -625,10 +629,11 @@ class MQTTClient(MQTT_base):
     async def _keep_connected(self):
         while self._has_connected:
             if self.isconnected():  # Pause for 1 second
+                self._reconnect_tries = 0
                 await asyncio.sleep(1)
                 gc.collect()
             else:
-                self._sta_if.disconnect()
+                self._sta_if.active(False)
                 await asyncio.sleep(1)
                 try:
                     await self.wifi_connect()
@@ -642,7 +647,11 @@ class MQTTClient(MQTT_base):
                     # Now has set ._isconnected and scheduled _connect_handler().
                     self.dprint("Reconnect OK!")
                 except OSError as e:
-                    self.dprint("Error in reconnect.", e)
+                    self._reconnect_tries += 1
+                    if self._reconnect_tries > 1:
+                        self.dprint("Connect failed again. Hard resetting ESP")
+                        reset()
+                    self.dprint("Error in reconnect. Failed {} times".format(self._reconnect_tries), e)
                     # Can get ECONNABORTED or -1. The latter signifies no or bad CONNACK received.
                     self.close()  # Disconnect and try again.
                     self._in_connect = False

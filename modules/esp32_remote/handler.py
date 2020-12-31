@@ -97,6 +97,7 @@ class Handler:
             await self.send_error("Could not send ISCP command ({}, {}={})".format(identifier, command, argument), data)
 
         data["result"] = result
+        data["type"] = "ISCP"
         await self._record_send_command(data)
 
     async def send_nec_command(self, data: dict) -> None:
@@ -167,7 +168,7 @@ class Handler:
         print("Subscribed to topics and published livesign to {}".format(self.topic_name("livesign")))
 
     async def send_lifesign_if_necessary(self) -> None:
-        if self.last_lifesign is None or self.last_lifesign < time.ticks_ms() - 60 * 1000:
+        if self.last_lifesign is None or self.last_lifesign + 5 * 1000 < time.ticks_ms():
             await self.send_lifesign()
 
     async def send_lifesign(self) -> None:
