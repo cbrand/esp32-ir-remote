@@ -23,7 +23,10 @@ class ISCPHandler:
         iscp_command = ISCPCommand(identifier, command, argument)
 
         lock = self.known_iscps_lock.setdefault(identifier, Lock())
-        with await lock:
+        if lock.locked():
+            return None
+
+        async with lock:
             iscp = await self._get_or_query(identifier)
             if iscp is None:
                 print("Didn't find ISCP target with identifier {}".format(iscp))

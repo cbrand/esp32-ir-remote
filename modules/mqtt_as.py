@@ -523,7 +523,21 @@ class MQTTClient(MQTT_base):
                     if i >= 10:
                         break
             else:
+                start_time = ticks_ms()
+                max_wait_time = 60000
                 while s.status() == network.STAT_CONNECTING:  # Break out on fail or success. Check once per sec.
+                    if ticks_diff(ticks_ms(), start_time) > max_wait_time:
+                        self.dprint(
+                            "Waited for {} seconds for a conncetion to occur. Hard reboot to clear local state".format(
+                                max_wait_time / 1000
+                            )
+                        )
+                        self._sta_if.active(False)
+                        reset()
+                    else:
+                        self.dprint(
+                            "Waiting for WiFi to connect. Waiting for {}ms".format(ticks_diff(ticks_ms(), start_time))
+                        )
                     await asyncio.sleep(1)
 
         if not s.isconnected():
@@ -650,6 +664,7 @@ class MQTTClient(MQTT_base):
                     self._reconnect_tries += 1
                     if self._reconnect_tries > 1:
                         self.dprint("Connect failed again. Hard resetting ESP")
+                        self._sta_if.active(False)
                         reset()
                     self.dprint("Error in reconnect. Failed {} times".format(self._reconnect_tries), e)
                     # Can get ECONNABORTED or -1. The latter signifies no or bad CONNACK received.

@@ -101,7 +101,12 @@ class Handler:
                 result = await self.iscp_handler.send(identifier, command, argument)
                 check = True
             except Exception as error:
-                await self.send_error("Could not send ISCP command ({}, {}={}). Error: {}. Retry: {}".format(identifier, command, argument, error, retries), data)
+                await self.send_error(
+                    "Could not send ISCP command ({}, {}={}). Error: {}. Retry: {}".format(
+                        identifier, command, argument, error, retries
+                    ),
+                    data,
+                )
                 retries += 1
                 if retries > 3:
                     raise error
