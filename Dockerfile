@@ -40,5 +40,11 @@ WORKDIR /opt/app/micropython/ports/esp32
 # RUN sed -i "s/^MICROPY_SSL_AXTLS.*$/MICROPY_SSL_AXTLS = 0\n/g" Makefile
 RUN make
 
+WORKDIR /opt/app/
+
+RUN git clone --depth 1 --branch 0.9.2 https://github.com/cbrand/eiscp-micropython.git && cp -r eiscp-micropython/src/eiscp /opt/app/micropython/ports/esp32/modules/
+
+WORKDIR /opt/app/micropython/ports/esp32
+
 COPY modules modules/
 RUN make

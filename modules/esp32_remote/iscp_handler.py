@@ -1,7 +1,7 @@
 from collections import namedtuple
 from uasyncio import Lock
 
-from iscp import discover, eISCP
+from eiscp import discover, eISCP
 
 ISCPCommand = namedtuple("ISCPCommand", ("identifier", "command", "argument"))
 
