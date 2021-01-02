@@ -27,7 +27,7 @@ An example of the `config.json` can be found [here](config.example.json).
 
 ## Preliminary Software ##
 
-![A picture of the user interface utilizing the ESP32 software](images/ui.png)
+<img height="600" alt="A picture of the user interface utilizing the ESP32 software" src="images/ui.png">
 
 For fully using this application, there also exists a cloud backend and frontend:
 
