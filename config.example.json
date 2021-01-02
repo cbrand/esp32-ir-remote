@@ -4,7 +4,7 @@
     "topic_prefix": "app/ir-remote/living-room",
     "user": "mqtt-remote",
     "password": "",
-    "server": "scolterius.net",
+    "server": "mqtt-server.net",
     "port": 8883,
     "ssid": "",
     "wifi_pw": ""
