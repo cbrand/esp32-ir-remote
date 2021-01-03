@@ -17,10 +17,13 @@ def current_isotime():
     return "{:04d}-{:02d}-{:02d}T{:02d}:{:02d}:{:02d}".format(*current_time[0:6])
 
 
-async def wifi_han(state):
+async def wifi_han(state: bool) -> None:
     print("Wifi is", "up" if state else "down")
     if state:
-        settime()
+        try:
+            settime()
+        except Exception:
+            pass
     await uasyncio.sleep_ms(1000)
 
 
@@ -28,7 +31,7 @@ class Handler:
     def __init__(self, config: dict):
         config["subs_cb"] = self.sub_cb
         config["connect_coro"] = self.subscribe_topics
-        config["wifi_coro"] = wifi_han
+        config["wifi_coro"] = self.on_wifi
         self.config = config
         self.client = MQTTClient(config)
         self.stopped = False
@@ -176,6 +179,11 @@ class Handler:
         except Exception as e:
             print(e)
             raise
+
+    async def on_wifi(self, state: bool):
+        await wifi_han(state)
+        self.iscp_handler.reset()
+
 
     async def subscribe_topics(self, client: MQTTClient):
         await client.subscribe(self.topic_name("ir/listening-mode"), 1)

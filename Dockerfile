@@ -42,7 +42,7 @@ RUN make
 
 WORKDIR /opt/app/
 
-RUN git clone --depth 1 --branch 0.9.4 https://github.com/cbrand/eiscp-micropython.git && cp -r eiscp-micropython/src/eiscp /opt/app/micropython/ports/esp32/modules/
+RUN git clone --depth 1 --branch 0.9.9 https://github.com/cbrand/eiscp-micropython.git && cp -r eiscp-micropython/src/eiscp /opt/app/micropython/ports/esp32/modules/
 
 WORKDIR /opt/app/micropython/ports/esp32
 
