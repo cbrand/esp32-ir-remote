@@ -8,7 +8,7 @@ def get_config(with_ssl: bool = True, config_path: str = "/config.json"):
     with open(config_path, "r") as handle:
         data = json.load(handle)
 
-    for key in ("topic_prefix", "client_id", "server", "port", "ssid", "wifi_pw", "no_run"):
+    for key in ("topic_prefix", "client_id", "server", "port", "user", "password", "ssl", "ssid", "wifi_pw", "no_run"):
         config[key] = data.get(key, None)
 
     config["tx_pin"] = config.get("tx_pin", 17)
@@ -17,7 +17,7 @@ def get_config(with_ssl: bool = True, config_path: str = "/config.json"):
     del data
     gc.collect()
 
-    if with_ssl:
+    if with_ssl and config.get("ssl", None) is not False:
         config["ssl"] = True
         gc.collect()
 
