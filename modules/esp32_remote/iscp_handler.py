@@ -3,8 +3,8 @@ from uasyncio import Lock
 
 from eiscp import discover, eISCP
 
+
 class ISCPCommand(namedtuple("ISCPCommand", ("identifier", "command", "argument"))):
-    
     @property
     def expect_response(self) -> bool:
         return True
@@ -35,7 +35,7 @@ class ISCPHandler:
         async with lock:
             iscp = await self._get_or_query(identifier)
             if iscp is None:
-                print("Didn't find ISCP target with identifier {}".format(iscp))
+                print("Didn't find ISCP target with identifier {}".format(identifier))
                 return None
             print("Found ISCP device for sending to {} ({})".format(identifier, iscp.info))
 
